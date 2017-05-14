@@ -142,6 +142,8 @@ namespace Pairs {
 			this->Controls->Add(this->progressBar1);
 			this->Controls->Add(this->menuStrip1);
 			this->MainMenuStrip = this->menuStrip1;
+			this->MaximumSize = System::Drawing::Size(352, 520);
+			this->MinimumSize = System::Drawing::Size(352, 520);
 			this->Name = L"MyForm";
 			this->StartPosition = System::Windows::Forms::FormStartPosition::CenterScreen;
 			this->Text = L"Pairs";
