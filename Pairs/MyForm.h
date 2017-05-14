@@ -1,6 +1,8 @@
 #pragma once
 #include "Game.h";
-#include <string>
+#include "GameData.h";
+#include <string>;
+#include <time.h>;
 
 namespace Pairs {
 
@@ -10,6 +12,7 @@ namespace Pairs {
 	using namespace System::Windows::Forms;
 	using namespace System::Data;
 	using namespace System::Drawing;
+	using namespace System::Threading;
 
 	/// <summary>
 	/// Summary for MyForm
@@ -58,10 +61,9 @@ namespace Pairs {
 	// Size of image
 	private: int WIDTH_OF_IMAGE = 100;
 	private: int HEIGHT_OF_IMAGE = 100;
-	// 
 	private: Game* game = new Game();
-
-
+	private: int** controlArray;
+	private: std::string* pathImagesInGame;
 
 	protected:
 
@@ -168,16 +170,61 @@ namespace Pairs {
 				images[index]->Width = WIDTH_OF_IMAGE;
 				images[index]->Image = bg;
 				images[index]->Tag = index;
-				images[index]->Click += gcnew System::EventHandler(&MyForm::image_Click);
+				images[index]->Click += gcnew System::EventHandler(this, &MyForm::image_Click);
+				//&MyForm::image_Click
 				this->Controls->Add(images[index]);
 			}
 		}
 	}
-	static System::Void image_Click(System::Object^  sender, System::EventArgs^  e) 
+	private: System::Void image_Click(System::Object^  sender, System::EventArgs^  e)
 	{
 		PictureBox^ image = (PictureBox^)sender;
-		MessageBox::Show(Convert::ToString(image->Tag));
-		/////////////////////////////////////////////////
+		_resultClick result = game->click(Convert::ToString(image->Tag));
+
+		// Show only first image
+		if (result.img1 != -1 && result.img1Show && result.img2 == -1 && !result.img2Show)
+		{
+			int i = Math::Floor(result.img1 / 3.0);
+			int j = result.img1 - 3 * i;
+
+			images[result.img1]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[i][j]].c_str()));
+		}
+		// Show first and second images
+		if (result.img1 != -1 && result.img1Show && result.img2 != -1 && result.img2Show && result.delay == 0)
+		{
+			int i1 = Math::Floor(result.img1 / 3.0);
+			int j1 = result.img1 - 3 * i1;
+			images[result.img1]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[i1][j1]].c_str()));
+
+			int i2 = Math::Floor(result.img2 / 3.0);
+			int j2 = result.img2 - 3 * i2;
+			images[result.img2]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[i2][j2]].c_str()));
+
+			game->controlArray[i1][j1] = -1;
+			game->controlArray[i2][j2] = -1;
+		}
+		if (result.img1 != -1 && result.img1Show && result.img2 != -1 && result.img2Show && result.delay > 0)
+		{
+			int i1 = Math::Floor(result.img1 / 3.0);
+			int j1 = result.img1 - 3 * i1;
+			images[result.img1]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[i1][j1]].c_str()));
+
+			int i2 = Math::Floor(result.img2 / 3.0);
+			int j2 = result.img2 - 3 * i2;
+			images[result.img2]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[i2][j2]].c_str()));
+
+			String^ str = result.img1.ToString() + " " + result.img2.ToString();
+			Thread^ T = gcnew System::Threading::Thread(gcnew ParameterizedThreadStart(this, &MyForm::threadFunc));
+			T->Start(str);
+		}
+	}
+	private: void threadFunc(Object^ data)
+	{
+		Thread::Sleep(1000);
+
+		String^ str = (String^)data;
+		images[Convert::ToInt16(str->Split()[0])]->Image = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\cover.png");
+		images[Convert::ToInt16(str->Split()[1])]->Image = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\cover.png");
 	}
 	private: System::Void exitToolStripMenuItem_Click(System::Object^  sender, System::EventArgs^  e) {
 		
@@ -185,19 +232,11 @@ namespace Pairs {
 	}
 	private: System::Void startToolStripMenuItem_Click(System::Object^  sender, System::EventArgs^  e) {
 		game->startGame();
-		int** controlArray = game->getControlArray();
-		std::string* pathImagesInGame = game->getPathImagesInGames();
-
-		for (int i = 0; i < HEIGHT_AMOUNT_OF_IMAGES; ++i)
+		controlArray = game->getControlArray();
+		pathImagesInGame = game->getPathImagesInGames();
+		for (int i = 0; i < AMOUNT_OF_IMAGES; ++i)
 		{
-			for (int j = 0; j < WIDTH_AMOUNT_OF_IMAGES; ++j)
-			{
-				// Transform: (i, j)->index
-				int index = i * WIDTH_AMOUNT_OF_IMAGES + j;
-				String^ path = gcnew String(pathImagesInGame[controlArray[i][j]].c_str());
-				Image^ img = Image::FromFile(path);
-				images[index]->Image = img;
-			}
+			images[i]->Image = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\cover.png");
 		}
 	}
 };
