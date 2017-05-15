@@ -44,7 +44,7 @@ namespace Pairs {
 	private: System::Windows::Forms::ToolStripMenuItem^  startToolStripMenuItem;
 	private: System::Windows::Forms::ProgressBar^  progressBar1;
 	private: System::Windows::Forms::ToolStripMenuItem^  exitToolStripMenuItem;
-	private: System::Windows::Forms::ToolStripMenuItem^  aboutToolStripMenuItem;
+
 	// Count of images for width
 	private: int WIDTH_AMOUNT_OF_IMAGES = 3;
 	// Count of images for height
@@ -53,6 +53,8 @@ namespace Pairs {
 	private: int INDENTATION_BETWEEN_IMAGES = 6;
 	// Count of images in window
 	private: int AMOUNT_OF_IMAGES = 12;
+	private: int DURATION_GAME_MS = 15000;
+	private: int SHOW_IMAGE_FRONT_MS = 3000;
 	// Images array
 	private: array <PictureBox^, 1>^ images = gcnew array <PictureBox^, 1>(AMOUNT_OF_IMAGES);
 	// Start of image position
@@ -64,6 +66,10 @@ namespace Pairs {
 	private: Game* game = new Game();
 	private: int** controlArray;
 	private: std::string* pathImagesInGame;
+	private: Thread^ durationThread;
+	private: Thread^ showingThread;
+	//Delegate for get access to Windows Forms Controls
+	delegate void SetValueProgressBar(int value);
 
 	protected:
 
@@ -87,16 +93,15 @@ namespace Pairs {
 			this->menuStrip1 = (gcnew System::Windows::Forms::MenuStrip());
 			this->startToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->exitToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
-			this->aboutToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->progressBar1 = (gcnew System::Windows::Forms::ProgressBar());
 			this->menuStrip1->SuspendLayout();
 			this->SuspendLayout();
 			// 
 			// menuStrip1
 			// 
-			this->menuStrip1->Items->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(3) {
+			this->menuStrip1->Items->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(2) {
 				this->startToolStripMenuItem,
-					this->exitToolStripMenuItem, this->aboutToolStripMenuItem
+					this->exitToolStripMenuItem
 			});
 			this->menuStrip1->Location = System::Drawing::Point(0, 0);
 			this->menuStrip1->Name = L"menuStrip1";
@@ -118,12 +123,6 @@ namespace Pairs {
 			this->exitToolStripMenuItem->Size = System::Drawing::Size(37, 20);
 			this->exitToolStripMenuItem->Text = L"Exit";
 			this->exitToolStripMenuItem->Click += gcnew System::EventHandler(this, &MyForm::exitToolStripMenuItem_Click);
-			// 
-			// aboutToolStripMenuItem
-			// 
-			this->aboutToolStripMenuItem->Name = L"aboutToolStripMenuItem";
-			this->aboutToolStripMenuItem->Size = System::Drawing::Size(52, 20);
-			this->aboutToolStripMenuItem->Text = L"About";
 			// 
 			// progressBar1
 			// 
@@ -155,7 +154,8 @@ namespace Pairs {
 
 		}
 #pragma endregion
-	private: System::Void MyForm_Load(System::Object^  sender, System::EventArgs^  e) {
+	private: System::Void MyForm_Load(System::Object^  sender, System::EventArgs^  e) 
+	{
 		Image^ bg = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\bg.png");
 		for (int i = 0; i < HEIGHT_AMOUNT_OF_IMAGES; ++i)
 		{
@@ -201,7 +201,7 @@ namespace Pairs {
 			int i2 = Math::Floor(result.img2 / 3.0);
 			int j2 = result.img2 - 3 * i2;
 			images[result.img2]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[i2][j2]].c_str()));
-
+			// Delete images here because we need indexes to showing
 			game->controlArray[i1][j1] = -1;
 			game->controlArray[i2][j2] = -1;
 		}
@@ -219,6 +219,13 @@ namespace Pairs {
 			Thread^ T = gcnew System::Threading::Thread(gcnew ParameterizedThreadStart(this, &MyForm::threadFunc));
 			T->Start(str);
 		}
+
+		if (game->checkWin())
+		{
+			game->staredtGame = false;
+			durationThread->Abort();
+			MessageBox::Show("You win");			
+		}
 	}
 	private: void threadFunc(Object^ data)
 	{
@@ -228,17 +235,89 @@ namespace Pairs {
 		images[Convert::ToInt16(str->Split()[0])]->Image = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\cover.png");
 		images[Convert::ToInt16(str->Split()[1])]->Image = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\cover.png");
 	}
-	private: System::Void exitToolStripMenuItem_Click(System::Object^  sender, System::EventArgs^  e) {
-		
+	private: System::Void exitToolStripMenuItem_Click(System::Object^  sender, System::EventArgs^  e)
+	{
+		// Check thread because have exception
+		if (showingThread)
+		{
+			showingThread->Abort();
+		}
+		if (durationThread)
+		{
+			durationThread->Abort();
+		}
 		Application::Exit();
 	}
-	private: System::Void startToolStripMenuItem_Click(System::Object^  sender, System::EventArgs^  e) {
+	private: System::Void startToolStripMenuItem_Click(System::Object^  sender, System::EventArgs^  e) 
+	{
 		game->startGame();
 		controlArray = game->getControlArray();
 		pathImagesInGame = game->getPathImagesInGames();
+
+		// Previously showing images
+		for (int i = 0; i < AMOUNT_OF_IMAGES; ++i)
+		{
+			// i -> [i][j]
+			int ic = Math::Floor(i / 3.0);
+			int jc = i - 3 * ic;
+			// Show current image
+			images[i]->Image = Image::FromFile(gcnew String(pathImagesInGame[controlArray[ic][jc]].c_str()));
+		}
+
+
+		if (showingThread)
+		{
+			durationThread->Abort();
+		}
+		showingThread = gcnew System::Threading::Thread(gcnew ThreadStart(this, &MyForm::showCoverImg));
+		showingThread->Start();
+
+		
+		if (durationThread)
+		{
+			durationThread->Abort();
+		}
+		durationThread = gcnew System::Threading::Thread(gcnew ThreadStart(this, &MyForm::gameDuration));
+		durationThread->Start();
+	}
+	// Show images 3 second and then show they bg
+	private: System::Void showCoverImg()
+	{
+		Thread::Sleep(SHOW_IMAGE_FRONT_MS);
+		// Started game after 3 second delay
+		game->staredtGame = true;
 		for (int i = 0; i < AMOUNT_OF_IMAGES; ++i)
 		{
 			images[i]->Image = Image::FromFile(Environment::CurrentDirectory + "\\img\\system\\cover.png");
+		}
+	}
+	private: System::Void SetValueProgressBarMethod(int value) 
+	{
+		progressBar1->Value = Convert::ToInt16(value);
+	}
+	// Duration games
+	private: System::Void gameDuration()
+	{
+		Thread::Sleep(SHOW_IMAGE_FRONT_MS);
+		for (int i = 1; i <= 100; ++i)
+		{
+			// Get access to Windows Forms Controls
+			SetValueProgressBar^ d = gcnew SetValueProgressBar(this, &MyForm::SetValueProgressBarMethod);
+			this->Invoke(d, i);
+		
+			Thread::Sleep(DURATION_GAME_MS / 100);
+		}
+		//Thread::Sleep(DURATION_GAME_MS);
+		// Check for win
+		if (game->checkWin())
+		{
+			MessageBox::Show("You win");
+			game->staredtGame = false;
+		}
+		else
+		{
+			MessageBox::Show("You lose");
+			game->staredtGame = false;
 		}
 	}
 };
