@@ -22,6 +22,15 @@ public:
 	// Control array	
 	//int controlArray[4][3];
 	int** controlArray;
+	bool staredtGame = false;
+	bool checkWin() 
+	{
+		if (this->countOfGuessed == this->COUNT_OF_GAME_IMAGES)
+		{
+			return true;
+		}
+		return false;
+	}
 	void setImagesPath()
 	{
 		array<String^>^ files = System::IO::Directory::GetFiles(System::Environment::CurrentDirectory + "\\img\\content\\", "*.jpg");
@@ -75,7 +84,7 @@ public:
 			int buff = Math::Floor(i / 3.0);
 			this->controlArray[buff][i - 3 * buff] = temp[i];
 		}
-		this->staredtGame = true;
+		this->countOfGuessed = 0;
 	}
 	int** getControlArray()
 	{
@@ -133,6 +142,7 @@ public:
 
 						resultClick = { this->openedImage, index, true, true, 0 };
 						this->openedImage = -1;
+						this->countOfGuessed++;
 						return resultClick;
 					}
 					// Check if previous image != current image
@@ -166,8 +176,11 @@ private:
 	const int COUNT_OF_GAME_IMAGES = 6;
 	int COUNT_OF_ALL_IMAGES;
 	int openedImage = -1;
-	bool staredtGame = false;
+	// Result for showing in UI
 	_resultClick resultClick;
+	// Count of guessed image. When game start we don't guessed any image -> 0
+	int countOfGuessed = 0;
+	// Convert String^ -> std::string
 	void MarshalString(String^ s, std::string& os) {
 		using namespace Runtime::InteropServices;
 		const char* chars =
@@ -175,6 +188,7 @@ private:
 		os = chars;
 		Marshal::FreeHGlobal(IntPtr((void*)chars));
 	}
+	// Condition for delete non-unique value
 	static bool condition(int a, int b)
 	{
 		return (a == b);
