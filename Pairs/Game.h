@@ -85,6 +85,7 @@ public:
 			this->controlArray[buff][i - 3 * buff] = temp[i];
 		}
 		this->countOfGuessed = 0;
+		this->openedImage = -1;
 	}
 	int** getControlArray()
 	{
